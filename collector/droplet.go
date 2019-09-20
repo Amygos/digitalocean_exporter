@@ -24,6 +24,7 @@ type DropletCollector struct {
 	Disk         *prometheus.Desc
 	PriceHourly  *prometheus.Desc
 	PriceMonthly *prometheus.Desc
+	CreatedAt    *prometheus.Desc
 }
 
 // NewDropletCollector returns a new DropletCollector.
@@ -67,6 +68,11 @@ func NewDropletCollector(logger log.Logger, errors *prometheus.CounterVec, clien
 			"Price of the Droplet billed monthly in dollars",
 			labels, nil,
 		),
+		CreatedAt: prometheus.NewDesc(
+			"digitalocean_droplet_created_at",
+			"Droplet creation date",
+			labels, nil,
+		),
 	}
 }
 
@@ -79,6 +85,7 @@ func (c *DropletCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.Disk
 	ch <- c.PriceHourly
 	ch <- c.PriceMonthly
+	ch <- c.CreatedAt
 }
 
 // Collect is called by the Prometheus registry when collecting metrics.
@@ -100,6 +107,9 @@ func (c *DropletCollector) Collect(ch chan<- prometheus.Metric) {
 			droplet.Name,
 			droplet.Region.Slug,
 		}
+
+		var createdAt time.Time
+		createdAt, _ = time.Parse(time.RFC3339, droplet.Created)
 
 		var active float64
 		if droplet.Status == "active" {
@@ -141,5 +151,12 @@ func (c *DropletCollector) Collect(ch chan<- prometheus.Metric) {
 			float64(droplet.Size.PriceMonthly),
 			labels...,
 		)
+		ch <- prometheus.MustNewConstMetric(
+			c.CreatedAt,
+			prometheus.GaugeValue,
+			float64(createdAt.Unix()),
+			labels...,
+		)
+
 	}
 }
